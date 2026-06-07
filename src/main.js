@@ -146,6 +146,107 @@ if (typeof world.showGraticules === 'function') {
 
 scene.add(world)
 
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+let pointPopupTimer = null
+const pointPopup = document.createElement('div')
+pointPopup.className = 'point-popup'
+pointPopup.style.display = 'none'
+pointPopup.innerHTML = '<button class="close-btn" aria-label="Close popup">&times;</button><div class="popup-content"></div>'
+globeContainer.appendChild(pointPopup)
+
+pointPopup.querySelector('.close-btn').addEventListener('click', (event) => {
+  event.stopPropagation()
+  hidePointPopup()
+})
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function formatPointDetails(point) {
+  const rows = []
+  rows.push(`<div class="popup-title">${escapeHtml(point.label || 'Data point')}</div>`)
+  rows.push(`<div class="popup-meta"><strong>Weight:</strong> ${escapeHtml(point.weight)}</div>`)
+  rows.push(`<div class="popup-meta"><strong>Coordinates:</strong> ${escapeHtml(point.lat.toFixed(4))}, ${escapeHtml(point.lng.toFixed(4))}</div>`)
+  rows.push(`<div class="popup-meta"><strong>Source:</strong> ${escapeHtml(point.source)}</div>`)
+
+  const original = point.original || {}
+  const json = escapeHtml(JSON.stringify(original, null, 2))
+  rows.push('<div class="popup-subtitle">Source row</div>')
+  rows.push(`<pre class="popup-json">${json}</pre>`)
+
+  return rows.join('')
+}
+
+function showPointPopup(point, x, y) {
+  const bounds = globeContainer.getBoundingClientRect()
+  const popupWidth = 280
+  const popupHeight = 260
+  const left = Math.min(bounds.width - popupWidth - 12, Math.max(12, x + 12))
+  const top = Math.min(bounds.height - popupHeight - 12, Math.max(12, y + 12))
+
+  pointPopup.style.left = `${left}px`
+  pointPopup.style.top = `${top}px`
+  pointPopup.style.display = 'block'
+  pointPopup.querySelector('.popup-content').innerHTML = formatPointDetails(point)
+
+  if (pointPopupTimer) {
+    window.clearTimeout(pointPopupTimer)
+  }
+  pointPopupTimer = window.setTimeout(hidePointPopup, 4500)
+}
+
+function hidePointPopup() {
+  pointPopup.style.display = 'none'
+  if (pointPopupTimer) {
+    window.clearTimeout(pointPopupTimer)
+    pointPopupTimer = null
+  }
+}
+
+function getPointDataFromIntersection(intersect) {
+  let obj = intersect.object
+  while (obj && !obj.__globeObjType) {
+    obj = obj.parent
+  }
+  if (!obj || obj.__globeObjType !== 'point') {
+    return null
+  }
+
+  const target = obj.__currentTargetD
+  if (!target) {
+    return null
+  }
+
+  return points.find(p => Math.abs(p.lat - target.lat) < 1e-6 && Math.abs(p.lng - target.lng) < 1e-6)
+}
+
+function onGlobeClick(event) {
+  const rect = renderer.domElement.getBoundingClientRect()
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+  raycaster.setFromCamera(mouse, camera)
+
+  const intersects = raycaster.intersectObjects(scene.children, true)
+  for (const intersect of intersects) {
+    const point = getPointDataFromIntersection(intersect)
+    if (point) {
+      showPointPopup(point, event.clientX - rect.left, event.clientY - rect.top)
+      return
+    }
+  }
+
+  hidePointPopup()
+}
+
+renderer.domElement.addEventListener('click', onGlobeClick)
+
 // outer glow sphere
 const glowMat = new THREE.MeshBasicMaterial({ color: 0x00ffd5, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.02 })
 const glowSphere = new THREE.Mesh(new THREE.SphereGeometry(RADIUS * 1.02, 48, 48), glowMat)
@@ -167,11 +268,15 @@ const navState = {
 
 function applyPoints(data, latKey = 'lat', lngKey = 'lng', weightKey = 'weight'){
   const source = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
-  points = source.map(d => ({
+  const sourceUrl = document.getElementById('dataUrl').value.trim() || 'unknown source'
+  points = source.map((d, index) => ({
+    id: index,
     lat: +d[latKey],
     lng: +d[lngKey],
     weight: d[weightKey] != null ? +d[weightKey] : 1,
-    label: d.label || d.name || `${d[latKey]}, ${d[lngKey]}`
+    label: d.label || d.name || `${d[latKey]}, ${d[lngKey]}`,
+    source: sourceUrl,
+    original: d
   })).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng))
 
   const max = Math.max(...points.map(p => p.weight), 1)
