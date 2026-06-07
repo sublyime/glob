@@ -1,0 +1,12 @@
+[
+  {"lat": 33.9416, "lng": -118.4085, "weight": 120, "label":"LAX"},
+  {"lat": 40.6413, "lng": -73.7781, "weight": 85, "label":"JFK"},
+  {"lat": 41.9742, "lng": -87.9073, "weight": 95, "label":"ORD"},
+  {"lat": 47.4502, "lng": -122.3088, "weight": 60, "label":"SEA"},
+  {"lat": 25.7933, "lng": -80.2906, "weight": 45, "label":"MIA"},
+  {"lat": 51.4700, "lng": -0.4543, "weight": 70, "label":"LHR"},
+  {"lat": 35.5494, "lng": 139.7798, "weight": 110, "label":"HND"},
+  {"lat": 55.9740, "lng": -3.3600, "weight": 30, "label":"EDI"},
+  {"lat": 28.4312, "lng": -81.3081, "weight": 25, "label":"MCO"},
+  {"lat": 19.4361, "lng": -99.0719, "weight": 50, "label":"MEX"}
+]
